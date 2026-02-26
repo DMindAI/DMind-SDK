@@ -5,7 +5,7 @@ TypeScript SDK for the [DMind AI](https://huggingface.co/DMindAI/DMind-3-nano) p
 ## Installation
 
 ```bash
-npm install dmind
+npm install @dmindai/sdk
 ```
 
 ## Quick Start
@@ -17,7 +17,7 @@ import {
   EXECUTE_SWAP,
   type SearchTokenInput,
   type ExecuteSwapInput,
-} from "dmind";
+} from "@dmindai/sdk";
 
 // 1. Implement the two built-in tools with your own backend logic
 //    params is fully typed — IDE will auto-complete all fields from SearchTokenInput / ExecuteSwapInput
@@ -90,7 +90,7 @@ Propose a token swap transaction.
 The tools can also be used directly without `implement()` — for schema definitions and input parsing only:
 
 ```ts
-import { SEARCH_TOKEN, EXECUTE_SWAP } from "dmind";
+import { SEARCH_TOKEN, EXECUTE_SWAP } from "@dmindai/sdk";
 
 // Get the fixed JSON schema for the chat API
 const tools = [SEARCH_TOKEN.toDefinition(), EXECUTE_SWAP.toDefinition()];
@@ -119,7 +119,7 @@ for await (const chunk of stream) {
 For automated multi-turn conversations with tool execution:
 
 ```ts
-import { DMind, runLoop } from "dmind";
+import { DMind, runLoop } from "@dmindai/sdk";
 
 const dmind = new DMind({
   modelGenerate: async (messages) => {
