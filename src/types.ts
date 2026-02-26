@@ -48,48 +48,25 @@ export type ToolHandler = (args: Record<string, any>) => Promise<any> | any;
 
 export type ToolHandlers = Partial<Record<ToolName, ToolHandler>>;
 
-export interface FunctionCallSDK {
+export interface SDKCore {
   generate(messages: Message[]): Promise<string>;
-  parseAssistantOutput(raw: string, mode?: ProtocolMode): ParsedResult;
-  validateToolCall(call: ToolCallResult): BasicValidationResult;
-  executeTool(call: ToolCallResult): Promise<any>;
-  wrapFunctionResponse(payload: any): string;
+  parse(raw: string, mode?: ProtocolMode): ParsedResult;
+  validate(call: ToolCallResult): BasicValidationResult;
+  execute(call: ToolCallResult): Promise<any>;
+  wrapResponse(payload: any): string;
 }
 
-export interface FunctionCallInteropSDK extends FunctionCallSDK {
-  parseDMindToOpenAIMessage(raw: string, mode?: ProtocolMode): OpenAIInteropResult;
-  parseOpenAIToDMindRaw(
-    message: OpenAIAssistantMessage,
-    protocol?: DmindProtocol
-  ): { type: "raw"; raw: string } | ParseErrorResult;
-  wrapToolResponseAsOpenAI(toolCallId: string, payload: any): OpenAIToolMessage;
-}
-
-export interface FunctionCallSDKOptions {
-  protocolMode?: ProtocolMode;
-  modelGenerate?: ModelGenerate;
-  tools?: ToolHandlers;
-  modelProfile?: ModelProfile;
-}
-
-export interface RunToolLoopOptions {
+export interface RunLoopOptions {
   maxToolHops?: number;
   mode?: ProtocolMode;
   functionResponseRole?: Extract<Role, "user" | "assistant">;
 }
 
-export interface RunToolLoopResult {
+export interface RunLoopResult {
   final: ParsedResult;
   messages: Message[];
   toolHops: number;
 }
-
-export interface ConvertToXmlResult {
-  ok: true;
-  xml: string;
-}
-
-export type DmindProtocol = "official" | "legacy";
 
 export type ToolParameterType = "string" | "number" | "boolean" | "object";
 
@@ -117,49 +94,3 @@ export interface ModelProfile {
 export interface ParseOptions {
   allowedTools?: Set<string>;
 }
-
-export interface InteropOptions {
-  allowedTools?: Set<string>;
-}
-
-export interface OpenAIFunctionCall {
-  name: string;
-  arguments: string;
-}
-
-export interface OpenAIToolCall {
-  id: string;
-  type: "function";
-  function: OpenAIFunctionCall;
-}
-
-export interface OpenAIAssistantMessage {
-  role: "assistant";
-  content: string | null;
-  tool_calls?: OpenAIToolCall[];
-}
-
-export interface OpenAIToolMessage {
-  role: "tool";
-  tool_call_id: string;
-  content: string;
-}
-
-export interface OpenAIChoiceLike {
-  message: OpenAIAssistantMessage;
-}
-
-export interface OpenAICompletionLike {
-  choices: OpenAIChoiceLike[];
-}
-
-export type InteropProtocol = "dmind_official" | "dmind_legacy" | "openai";
-
-export type OpenAIInteropResult =
-  | {
-      type: "assistant_message";
-      message: OpenAIAssistantMessage;
-      protocol: InteropProtocol;
-      raw: unknown;
-    }
-  | ParseErrorResult;

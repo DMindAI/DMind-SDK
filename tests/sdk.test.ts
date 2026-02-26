@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DMindFunctionCallSDK, runToolLoop, type ModelProfile } from "../src";
+import { DMind, runLoop, type ModelProfile } from "../src";
 
-describe("DMindFunctionCallSDK parser", () => {
+describe("DMind parser", () => {
   it("parses official protocol tool call", () => {
-    const sdk = new DMindFunctionCallSDK();
+    const sdk = new DMind();
     const raw =
       '<start_function_call>call:SEARCH_TOKEN{"symbol":"USDC","chain":"ethereum"}<end_function_call>';
-    const parsed = sdk.parseAssistantOutput(raw, "official");
+    const parsed = sdk.parse(raw, "official");
 
     expect(parsed).toEqual({
       type: "tool_call",
@@ -18,16 +18,16 @@ describe("DMindFunctionCallSDK parser", () => {
   });
 
   it("returns text when no protocol content exists", () => {
-    const sdk = new DMindFunctionCallSDK();
+    const sdk = new DMind();
     const raw = "How much SOL would you like to swap?";
-    const parsed = sdk.parseAssistantOutput(raw, "official");
+    const parsed = sdk.parse(raw, "official");
     expect(parsed).toEqual({ type: "text", text: raw, raw });
   });
 
   it("returns E_NO_WRAPPER for wrapper-less call string", () => {
-    const sdk = new DMindFunctionCallSDK();
+    const sdk = new DMind();
     const raw = 'call:SEARCH_TOKEN{"symbol":"USDC"}';
-    const parsed = sdk.parseAssistantOutput(raw, "official");
+    const parsed = sdk.parse(raw, "official");
 
     expect(parsed.type).toBe("parse_error");
     if (parsed.type === "parse_error") {
@@ -36,10 +36,10 @@ describe("DMindFunctionCallSDK parser", () => {
   });
 
   it("returns E_WRONG_PROTOCOL when legacy tags appear in official mode", () => {
-    const sdk = new DMindFunctionCallSDK();
+    const sdk = new DMind();
     const raw =
       '<function_calls><invoke name="SEARCH_TOKEN"><parameter name="symbol">USDC</parameter></invoke></function_calls>';
-    const parsed = sdk.parseAssistantOutput(raw, "official");
+    const parsed = sdk.parse(raw, "official");
 
     expect(parsed.type).toBe("parse_error");
     if (parsed.type === "parse_error") {
@@ -48,10 +48,10 @@ describe("DMindFunctionCallSDK parser", () => {
   });
 
   it("supports legacy format in dual mode", () => {
-    const sdk = new DMindFunctionCallSDK();
+    const sdk = new DMind();
     const raw =
       '<function_calls><invoke name="EXECUTE_SWAP"><parameter name="inputTokenSymbol">SOL</parameter><parameter name="inputTokenPercentage">0.3</parameter></invoke></function_calls>';
-    const parsed = sdk.parseAssistantOutput(raw, "dual");
+    const parsed = sdk.parse(raw, "dual");
 
     expect(parsed.type).toBe("tool_call");
     if (parsed.type === "tool_call") {
@@ -63,11 +63,11 @@ describe("DMindFunctionCallSDK parser", () => {
   });
 });
 
-describe("DMindFunctionCallSDK validator", () => {
-  const sdk = new DMindFunctionCallSDK();
+describe("DMind validator", () => {
+  const sdk = new DMind();
 
   it("checks SEARCH_TOKEN requires symbol/address/keyword", () => {
-    const result = sdk.validateToolCall({
+    const result = sdk.validate({
       type: "tool_call",
       tool: "SEARCH_TOKEN",
       args: { chain: "solana" },
@@ -81,7 +81,7 @@ describe("DMindFunctionCallSDK validator", () => {
   });
 
   it("checks EXECUTE_SWAP amount and percentage are mutually exclusive", () => {
-    const result = sdk.validateToolCall({
+    const result = sdk.validate({
       type: "tool_call",
       tool: "EXECUTE_SWAP",
       args: {
@@ -99,7 +99,7 @@ describe("DMindFunctionCallSDK validator", () => {
   });
 
   it("checks percentage must be in [0,1]", () => {
-    const result = sdk.validateToolCall({
+    const result = sdk.validate({
       type: "tool_call",
       tool: "EXECUTE_SWAP",
       args: {
@@ -116,10 +116,10 @@ describe("DMindFunctionCallSDK validator", () => {
   });
 });
 
-describe("DMindFunctionCallSDK runtime and xml conversion", () => {
+describe("DMind runtime", () => {
   it("runs multi-turn tool loop with function_response feedback", async () => {
     let turn = 0;
-    const sdk = new DMindFunctionCallSDK({
+    const sdk = new DMind({
       modelGenerate: async () => {
         turn += 1;
         if (turn === 1) {
@@ -137,7 +137,7 @@ describe("DMindFunctionCallSDK runtime and xml conversion", () => {
       }
     });
 
-    const result = await runToolLoop(sdk, [
+    const result = await runLoop(sdk, [
       { role: "developer", content: "Use official protocol for tool calls." },
       { role: "user", content: "Find the USDC contract address on Ethereum." }
     ]);
@@ -148,24 +148,9 @@ describe("DMindFunctionCallSDK runtime and xml conversion", () => {
       result.messages.some((m) => m.content.startsWith("<function_response>"))
     ).toBe(true);
   });
-
-  it("converts official call to legacy xml", () => {
-    const sdk = new DMindFunctionCallSDK();
-    const raw =
-      '<start_function_call>call:SEARCH_TOKEN{"symbol":"USDC","chain":"ethereum"}<end_function_call>';
-    const converted = sdk.convertOfficialToLegacyXml(raw);
-
-    if ("ok" in converted) {
-      expect(converted.xml).toBe(
-        '<function_calls><invoke name="SEARCH_TOKEN"><parameter name="symbol">USDC</parameter><parameter name="chain">ethereum</parameter></invoke></function_calls>'
-      );
-      return;
-    }
-    throw new Error("Expected conversion to succeed");
-  });
 });
 
-describe("DMindFunctionCallSDK extensibility", () => {
+describe("DMind extensibility", () => {
   const customProfile: ModelProfile = {
     id: "dmind-custom",
     tools: {
@@ -179,13 +164,13 @@ describe("DMindFunctionCallSDK extensibility", () => {
   };
 
   it("supports custom profile tool names", () => {
-    const sdk = new DMindFunctionCallSDK({
+    const sdk = new DMind({
       modelProfile: customProfile
     });
 
     const raw =
       '<start_function_call>call:PING_TOOL{"message":"hello"}<end_function_call>';
-    const parsed = sdk.parseAssistantOutput(raw, "official");
+    const parsed = sdk.parse(raw, "official");
     expect(parsed.type).toBe("tool_call");
     if (parsed.type === "tool_call") {
       expect(parsed.tool).toBe("PING_TOOL");
@@ -194,13 +179,13 @@ describe("DMindFunctionCallSDK extensibility", () => {
   });
 
   it("rejects unknown tools for the selected profile", () => {
-    const sdk = new DMindFunctionCallSDK({
+    const sdk = new DMind({
       modelProfile: customProfile
     });
 
     const raw =
       '<start_function_call>call:SEARCH_TOKEN{"symbol":"USDC"}<end_function_call>';
-    const parsed = sdk.parseAssistantOutput(raw, "official");
+    const parsed = sdk.parse(raw, "official");
     expect(parsed.type).toBe("parse_error");
     if (parsed.type === "parse_error") {
       expect(parsed.code).toBe("E_TOOL_UNKNOWN");

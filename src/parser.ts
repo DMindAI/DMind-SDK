@@ -114,7 +114,7 @@ function parseLegacyPayload(
   };
 }
 
-function parseOfficial(raw: string, options: ParseOptions = {}): ParsedResult {
+function matchOfficial(raw: string, options: ParseOptions = {}): ParsedResult {
   const matches = [...raw.matchAll(OFFICIAL_BLOCK_RE)];
   if (matches.length === 0) {
     if (
@@ -152,7 +152,7 @@ function parseOfficial(raw: string, options: ParseOptions = {}): ParsedResult {
   return parseOfficialPayload(match[1], raw, options);
 }
 
-function parseLegacy(raw: string, options: ParseOptions = {}): ParsedResult {
+function matchLegacy(raw: string, options: ParseOptions = {}): ParsedResult {
   const matches = [...raw.matchAll(LEGACY_BLOCK_RE)];
   if (matches.length === 0) {
     if (
@@ -202,7 +202,7 @@ function hasOfficialTags(raw: string): boolean {
   );
 }
 
-export function parseAssistantOutput(
+export function parse(
   raw: string,
   mode: ProtocolMode = "official",
   options: ParseOptions = {}
@@ -215,7 +215,7 @@ export function parseAssistantOutput(
         raw
       );
     }
-    return parseOfficial(raw, options);
+    return matchOfficial(raw, options);
   }
 
   if (mode === "legacy") {
@@ -226,10 +226,10 @@ export function parseAssistantOutput(
         raw
       );
     }
-    return parseLegacy(raw, options);
+    return matchLegacy(raw, options);
   }
 
-  const officialCandidate = parseOfficial(raw, options);
+  const officialCandidate = matchOfficial(raw, options);
   if (officialCandidate.type === "tool_call") {
     return officialCandidate;
   }
@@ -240,7 +240,7 @@ export function parseAssistantOutput(
     return officialCandidate;
   }
 
-  const legacyCandidate = parseLegacy(raw, options);
+  const legacyCandidate = matchLegacy(raw, options);
   if (legacyCandidate.type === "tool_call") {
     return legacyCandidate;
   }
@@ -262,13 +262,9 @@ export function parseAssistantOutput(
   return { type: "text", text: raw, raw };
 }
 
-export function parseOfficialToToolCall(
+export function parseOfficial(
   raw: string,
   options: ParseOptions = {}
 ): ToolCallResult | ParsedResult {
-  const parsed = parseAssistantOutput(raw, "official", options);
-  if (parsed.type !== "tool_call") {
-    return parsed;
-  }
-  return parsed;
+  return parse(raw, "official", options);
 }

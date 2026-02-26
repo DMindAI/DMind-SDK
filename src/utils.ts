@@ -49,15 +49,6 @@ export function decodeXml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-export function encodeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 export function parseLooseXmlValue(raw: string): any {
   const value = decodeXml(raw).trim();
   if (value.length === 0) {

@@ -1,106 +1,145 @@
-# DMind Function Call SDK
+# DMind SDK
 
-A protocol adapter SDK focused on tool-calling compatibility.
-
-It converts DMind function-call outputs to OpenAI/OpenRouter-style tool calls, and back again.
-
-## What This SDK Does
-
-- Parses DMind official wrapper format:
-  - `<start_function_call>call:TOOL_NAME{...}<end_function_call>`
-- Parses DMind legacy XML format:
-  - `<function_calls><invoke ... /></function_calls>`
-- Normalizes outputs to OpenAI-compatible assistant messages with `tool_calls`
-- Converts OpenAI assistant tool calls back to DMind raw protocol strings
-- Validates tool arguments with model profiles
+TypeScript SDK for the [DMind AI](https://huggingface.co/DMindAI/DMind-3-nano) platform — chat completions with built-in crypto trading tools.
 
 ## Installation
 
 ```bash
-npm install dmind-function-call-sdk
+npm install dmind
 ```
-
-## Default Profile
-
-The SDK ships with a built-in `dmind-3-nano` model profile and rules for:
-
-- `SEARCH_TOKEN`
-- `EXECUTE_SWAP`
 
 ## Quick Start
 
 ```ts
-import { DMindFunctionCallSDK } from "dmind-function-call-sdk";
-
-const sdk = new DMindFunctionCallSDK(); // uses dmind-3-nano profile by default
-
-const raw =
-  '<start_function_call>call:SEARCH_TOKEN{"symbol":"USDC","chain":"ethereum"}<end_function_call>';
-
-const openai = sdk.parseDMindToOpenAIMessage(raw);
-```
-
-## OpenAI / OpenRouter Interop
-
-```ts
 import {
-  dmindRawToOpenAIMessage,
-  openAIAssistantMessageToDMindRaw,
-  openAIToolResultMessage
-} from "dmind-function-call-sdk";
+  DMind,
+  SEARCH_TOKEN,
+  EXECUTE_SWAP,
+  type SearchTokenInput,
+  type ExecuteSwapInput,
+} from "dmind";
 
-const openaiMessage = dmindRawToOpenAIMessage(
-  '<start_function_call>call:SEARCH_TOKEN{"symbol":"USDC"}<end_function_call>'
-);
+// 1. Implement the two built-in tools with your own backend logic
+//    params is fully typed — IDE will auto-complete all fields from SearchTokenInput / ExecuteSwapInput
 
-const dmindRaw = openAIAssistantMessageToDMindRaw({
-  role: "assistant",
-  content: null,
-  tool_calls: [
-    {
-      id: "call_1",
-      type: "function",
-      function: { name: "SEARCH_TOKEN", arguments: "{\"symbol\":\"USDC\"}" }
-    }
-  ]
+const searchToken = SEARCH_TOKEN.implement(async (params: SearchTokenInput) => {
+  const tokens = await myTokenService.search(params);
+  return { tokens };
 });
 
-const toolResult = openAIToolResultMessage("call_1", {
-  status: "ok",
-  result: { address: "0x..." }
+const executeSwap = EXECUTE_SWAP.implement(async (params: ExecuteSwapInput) => {
+  const result = await myDexService.buildSwap(params);
+  return { transaction: result.transaction, quote: result.quote };
 });
+
+// 2. Create the DMind client
+
+const dmind = new DMind({
+  baseUrl: "http://localhost:8000/v1", // vLLM local server
+  apiKey: "your-api-key", // optional
+});
+
+// 3. Send a chat request with tool definitions
+
+const response = await dmind.chat.send({
+  messages: [{ role: "user", content: "Swap 1 SOL to USDC on Solana" }],
+  model: "dmind-3-nano",
+  tools: [searchToken.toDefinition(), executeSwap.toDefinition()],
+  toolChoice: "auto",
+});
+
+// 4. Handle the tool call
+
+const toolCall = response.choices[0].message.toolCalls?.[0];
+if (toolCall) {
+  const args = searchToken.parseInput(JSON.parse(toolCall.function.arguments));
+  console.log("Tool called:", toolCall.function.name, args);
+}
 ```
 
-## Extending for Other DMind Models
+## Built-in Tools
 
-You can provide a custom model profile to support other DMind-series formats and tool schemas.
+The SDK provides two fixed tools matching the [DMind-3-nano model card](https://huggingface.co/DMindAI/DMind-3-nano#tool-definitions--schemas). Their names, descriptions, and parameter schemas cannot be modified.
+
+### SEARCH_TOKEN
+
+Search for a cryptocurrency token on-chain to retrieve its metadata or address.
+
+| Parameter | Type   | Required | Description                                            |
+| --------- | ------ | -------- | ------------------------------------------------------ |
+| symbol    | string | No       | Token ticker symbol (e.g. `SOL`, `USDC`)               |
+| address   | string | No       | Contract address of the token                          |
+| chain     | string | No       | Target blockchain: `solana`, `ethereum`, `bsc`, `base` |
+| keyword   | string | No       | Free-text search keywords                              |
+
+### EXECUTE_SWAP
+
+Propose a token swap transaction.
+
+| Parameter            | Type   | Required | Description                             |
+| -------------------- | ------ | -------- | --------------------------------------- |
+| inputTokenSymbol     | string | Yes      | Symbol of the token being sold          |
+| inputTokenCA         | string | No       | Contract address of the input token     |
+| outputTokenCA        | string | No       | Contract address of the output token    |
+| inputTokenAmount     | number | No       | Absolute amount to swap                 |
+| inputTokenPercentage | number | No       | Percentage of balance to swap (0.0–1.0) |
+| outputTokenAmount    | number | No       | Minimum output amount expected          |
+
+### Using Tools Without Execute Logic
+
+The tools can also be used directly without `implement()` — for schema definitions and input parsing only:
 
 ```ts
-import { DMindFunctionCallSDK, type ModelProfile } from "dmind-function-call-sdk";
+import { SEARCH_TOKEN, EXECUTE_SWAP } from "dmind";
 
-const customProfile: ModelProfile = {
-  id: "dmind-x",
-  tools: {
-    PING_TOOL: {
-      strict: true,
-      parameters: {
-        message: { type: "string", required: true, nonEmpty: true }
-      }
-    }
-  }
-};
+// Get the fixed JSON schema for the chat API
+const tools = [SEARCH_TOKEN.toDefinition(), EXECUTE_SWAP.toDefinition()];
 
-const sdk = new DMindFunctionCallSDK({ modelProfile: customProfile });
+// Parse and validate raw tool call arguments
+const args = SEARCH_TOKEN.parseInput({ symbol: "SOL", chain: "solana" });
 ```
 
-## Error Codes
+## Streaming
 
-- `E_NO_WRAPPER`
-- `E_WRONG_PROTOCOL`
-- `E_JSON_INVALID`
-- `E_TOOL_UNKNOWN`
-- `E_PARAM_MISSING`
-- `E_PARAM_FORBIDDEN`
-- `E_PARAM_INVALID`
-- `E_INVOKE_COUNT`
+```ts
+const stream = await dmind.chat.send({
+  messages: [{ role: "user", content: "Find the USDC token on Ethereum" }],
+  model: "dmind-3-nano",
+  tools: [searchToken.toDefinition()],
+  stream: true,
+});
 
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0].delta.content ?? "");
+}
+```
+
+## Multi-turn Tool Loop
+
+For automated multi-turn conversations with tool execution:
+
+```ts
+import { DMind, runLoop } from "dmind";
+
+const dmind = new DMind({
+  modelGenerate: async (messages) => {
+    // call your model inference here
+    return modelResponse;
+  },
+  tools: {
+    SEARCH_TOKEN: async (args) => {
+      return await myTokenService.search(args);
+    },
+    EXECUTE_SWAP: async (args) => {
+      return await myDexService.buildSwap(args);
+    },
+  },
+});
+
+const result = await runLoop(dmind, [
+  { role: "user", content: "Swap 0.5 SOL to USDC" },
+]);
+
+console.log(result.final); // final parsed result
+console.log(result.toolHops); // number of tool calls executed
+```

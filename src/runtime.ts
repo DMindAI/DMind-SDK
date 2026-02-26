@@ -1,9 +1,9 @@
 import type {
-  FunctionCallSDK,
+  SDKCore,
   Message,
   ParsedResult,
-  RunToolLoopOptions,
-  RunToolLoopResult
+  RunLoopOptions,
+  RunLoopResult
 } from "./types";
 
 function toParseError(raw: string, message: string): ParsedResult {
@@ -15,11 +15,11 @@ function toParseError(raw: string, message: string): ParsedResult {
   };
 }
 
-export async function runToolLoop(
-  sdk: FunctionCallSDK,
+export async function runLoop(
+  sdk: SDKCore,
   messages: Message[],
-  options: RunToolLoopOptions = {}
-): Promise<RunToolLoopResult> {
+  options: RunLoopOptions = {}
+): Promise<RunLoopResult> {
   const mode = options.mode;
   const maxToolHops = options.maxToolHops ?? 3;
   const functionResponseRole = options.functionResponseRole ?? "user";
@@ -30,7 +30,7 @@ export async function runToolLoop(
   while (true) {
     const raw = await sdk.generate(history);
     history.push({ role: "assistant", content: raw });
-    const parsed = sdk.parseAssistantOutput(raw, mode);
+    const parsed = sdk.parse(raw, mode);
 
     if (parsed.type !== "tool_call") {
       return { final: parsed, messages: history, toolHops };
@@ -47,7 +47,7 @@ export async function runToolLoop(
       };
     }
 
-    const validation = sdk.validateToolCall(parsed);
+    const validation = sdk.validate(parsed);
     if (!validation.ok) {
       return {
         final: {
@@ -61,8 +61,8 @@ export async function runToolLoop(
       };
     }
 
-    const result = await sdk.executeTool(parsed);
-    const payload = sdk.wrapFunctionResponse({ status: "ok", result });
+    const result = await sdk.execute(parsed);
+    const payload = sdk.wrapResponse({ status: "ok", result });
     history.push({
       role: functionResponseRole,
       content: payload
@@ -70,4 +70,3 @@ export async function runToolLoop(
     toolHops += 1;
   }
 }
-

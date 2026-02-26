@@ -85,7 +85,7 @@ function validateEnum(
   }
 }
 
-export function validateToolCallDetailed(
+export function validateDetailed(
   call: ToolCallResult,
   profile: ModelProfile = DMIND_3_NANO_PROFILE
 ): DetailedValidationResult {
@@ -128,10 +128,7 @@ export function validateToolCallDetailed(
   }
 
   if (schema.customValidate) {
-    const customIssues = schema.customValidate(args);
-    for (const issue of customIssues) {
-      errors.push(issue);
-    }
+    errors.push(...schema.customValidate(args));
   }
 
   if (errors.length > 0) {
@@ -140,11 +137,11 @@ export function validateToolCallDetailed(
   return { ok: true };
 }
 
-export function validateToolCall(
+export function validate(
   call: ToolCallResult,
   profile: ModelProfile = DMIND_3_NANO_PROFILE
 ): BasicValidationResult {
-  const detailed = validateToolCallDetailed(call, profile);
+  const detailed = validateDetailed(call, profile);
   if (detailed.ok) {
     return { ok: true };
   }
@@ -153,4 +150,3 @@ export function validateToolCall(
     errors: detailed.errors.map((item) => `${item.code}: ${item.message}`)
   };
 }
-
