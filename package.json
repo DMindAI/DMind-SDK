@@ -1,0 +1,35 @@
+{
+  "name": "dmind-function-call-sdk",
+  "version": "0.1.0",
+  "description": "Protocol adapter SDK for DMind function-calling and OpenAI/OpenRouter tool-call compatibility.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "dmind",
+    "sdk",
+    "function-calling",
+    "tool-call",
+    "openai",
+    "openrouter",
+    "adapter"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}
