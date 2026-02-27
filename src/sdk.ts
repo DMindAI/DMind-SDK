@@ -5,6 +5,7 @@ import {
   FUNCTION_RESPONSE_START
 } from "./constants";
 import { SDKError } from "./errors";
+import { enforceDeveloperPrompt } from "./developer-prompt";
 import { parse } from "./parser";
 import { DMIND_3_NANO_PROFILE, toolNameSet } from "./profiles";
 import type {
@@ -57,7 +58,9 @@ export class DMind implements SDKCore {
         "modelGenerate is not configured. Pass options.modelGenerate in constructor."
       );
     }
-    return this.modelGenerate(messages);
+    return this.modelGenerate(
+      enforceDeveloperPrompt(messages, this.modelProfile.developerPromptPolicy)
+    );
   }
 
   parse(raw: string, mode: ProtocolMode = this.protocolMode): ParsedResult {

@@ -4,6 +4,17 @@ import { isLikelyTokenAddress, isNonEmptyString } from "./utils";
 
 const CHAIN_VALUES = ["solana", "ethereum", "bsc", "base"];
 
+export const DMIND_3_NANO_DEVELOPER_PROMPT = `You are a model that can do function calling with the following functions.
+
+You may use only two tools: SEARCH_TOKEN and EXECUTE_SWAP.
+
+Do not call any tools besides SEARCH_TOKEN and EXECUTE_SWAP.
+
+For function calls, output only this exact format:
+<start_function_call>call:TOOL_NAME{...JSON...}<end_function_call>
+
+If no function call is needed, output normal text without wrappers.`;
+
 function validateSearchToken(args: Record<string, any>): ValidationIssue[] {
   const errors: ValidationIssue[] = [];
 
@@ -83,6 +94,9 @@ function validateExecuteSwap(args: Record<string, any>): ValidationIssue[] {
 
 export const DMIND_3_NANO_PROFILE: ModelProfile = {
   id: "dmind-3-nano",
+  developerPromptPolicy: {
+    canonicalPrompt: DMIND_3_NANO_DEVELOPER_PROMPT
+  },
   tools: {
     SEARCH_TOKEN: {
       strict: true,

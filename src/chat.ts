@@ -1,4 +1,6 @@
 import { SDKError } from "./errors";
+import { enforceDeveloperPrompt } from "./developer-prompt";
+import { DMIND_3_NANO_PROFILE } from "./profiles";
 import {
   type ChatAssistantMessage,
   type ChatMessage,
@@ -16,6 +18,7 @@ import {
   type ToolChoiceOption,
   type ToolDefinition,
 } from "./chat-types";
+import type { ModelProfile } from "./types";
 
 // ---------------------------------------------------------------------------
 // camelCase -> snake_case request serialization
@@ -41,6 +44,8 @@ function serializeToolCall(tc: ChatToolCall): Record<string, unknown> {
 
 function serializeMessage(msg: ChatMessage): Record<string, unknown> {
   switch (msg.role) {
+    case "developer":
+      return { role: "developer", content: msg.content, ...(msg.name && { name: msg.name }) };
     case "system":
       return { role: "system", content: msg.content, ...(msg.name && { name: msg.name }) };
     case "user": {
@@ -257,6 +262,7 @@ export class Chat {
   private readonly baseUrl: string;
   private readonly defaultModel?: string;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly modelProfile: ModelProfile;
 
   /** @internal Created internally by the DMind constructor. */
   constructor(options: DMindOptions) {
@@ -264,6 +270,7 @@ export class Chat {
     this.baseUrl = (options.baseUrl ?? "").replace(/\/+$/, "");
     this.defaultModel = options.defaultModel;
     this.defaultHeaders = options.defaultHeaders ?? {};
+    this.modelProfile = options.modelProfile ?? DMIND_3_NANO_PROFILE;
   }
 
   async send(request: ChatRequest & { stream?: false }): Promise<ChatResponse>;
@@ -276,7 +283,14 @@ export class Chat {
   async send(
     request: ChatRequest,
   ): Promise<ChatResponse | AsyncIterable<ChatStreamingChunk>> {
-    const body = buildRequestBody(request, this.defaultModel);
+    const requestWithPrompt: ChatRequest = {
+      ...request,
+      messages: enforceDeveloperPrompt(
+        request.messages,
+        this.modelProfile.developerPromptPolicy
+      )
+    };
+    const body = buildRequestBody(requestWithPrompt, this.defaultModel);
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",

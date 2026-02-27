@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { DMind, type ChatResponse, type ChatStreamingChunk } from "../src";
+import {
+  DMind,
+  DMIND_3_NANO_DEVELOPER_PROMPT,
+  type ChatResponse,
+  type ChatStreamingChunk,
+  type ModelProfile
+} from "../src";
 
 function mockFetchResponse(body: unknown, status = 200): Response {
   return {
@@ -123,7 +129,14 @@ describe("DMind chat", () => {
 
     const body = JSON.parse(requestInit.body as string);
     expect(body.model).toBe("dmind-3-nano");
-    expect(body.messages[0]).toEqual({ role: "user", content: "What is the capital of France?" });
+    expect(body.messages[0]).toEqual({
+      role: "developer",
+      content: DMIND_3_NANO_DEVELOPER_PROMPT
+    });
+    expect(body.messages[1]).toEqual({
+      role: "user",
+      content: "What is the capital of France?"
+    });
   });
 
   it("serializes request parameters in snake_case", async () => {
@@ -226,9 +239,9 @@ describe("DMind chat", () => {
     });
 
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
-    const assistantMsg = body.messages[1];
+    const assistantMsg = body.messages[2];
     expect(assistantMsg.tool_calls[0].id).toBe("call_1");
-    const toolMsg = body.messages[2];
+    const toolMsg = body.messages[3];
     expect(toolMsg.tool_call_id).toBe("call_1");
     expect(toolMsg.role).toBe("tool");
   });
@@ -330,6 +343,76 @@ describe("DMind chat", () => {
 
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
     expect(body.model).toBe("dmind-4");
+  });
+
+  it("overrides invalid developer prompt with official prompt", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      mockFetchResponse({
+        id: "x",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      }),
+    );
+
+    await client.chat.send({
+      messages: [
+        { role: "developer", content: "Please call tools in JSON." },
+        { role: "user", content: "hi" },
+      ],
+    });
+
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    expect(body.messages[0]).toEqual({
+      role: "developer",
+      content: DMIND_3_NANO_DEVELOPER_PROMPT,
+    });
+    expect(body.messages[1]).toEqual({ role: "user", content: "hi" });
+  });
+
+  it("keeps official developer prompt unchanged", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      mockFetchResponse({
+        id: "x",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      }),
+    );
+
+    await client.chat.send({
+      messages: [
+        { role: "developer", content: DMIND_3_NANO_DEVELOPER_PROMPT },
+        { role: "user", content: "hi" },
+      ],
+    });
+
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    const developerMessages = body.messages.filter((msg: any) => msg.role === "developer");
+    expect(developerMessages).toHaveLength(1);
+    expect(developerMessages[0].content).toBe(DMIND_3_NANO_DEVELOPER_PROMPT);
+  });
+
+  it("skips prompt injection when custom profile has no developerPromptPolicy", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      mockFetchResponse({
+        id: "x",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      }),
+    );
+
+    const customProfile: ModelProfile = {
+      id: "custom-model",
+      tools: {},
+    };
+    const customClient = new DMind({
+      apiKey: "test-key",
+      baseUrl: "https://api.test.com/v1",
+      modelProfile: customProfile,
+    });
+
+    await customClient.chat.send({
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    expect(body.messages[0]).toEqual({ role: "user", content: "hi" });
   });
 
   it("exposes apiKey and baseUrl on DMind", () => {

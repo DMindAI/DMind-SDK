@@ -86,9 +86,15 @@ export interface ToolSchema {
   customValidate?: (args: Record<string, any>) => ValidationIssue[];
 }
 
+export interface DeveloperPromptPolicy {
+  canonicalPrompt: string;
+  requiredSnippets?: string[];
+}
+
 export interface ModelProfile {
   id: string;
   tools: Record<string, ToolSchema>;
+  developerPromptPolicy?: DeveloperPromptPolicy;
 }
 
 export interface ParseOptions {

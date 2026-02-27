@@ -20,6 +20,12 @@ export interface SystemMessage {
   name?: string;
 }
 
+export interface DeveloperMessage {
+  role: "developer";
+  content: string;
+  name?: string;
+}
+
 export interface UserMessage {
   role: "user";
   content: string | ContentPart[];
@@ -41,6 +47,7 @@ export interface ChatToolMessage {
 }
 
 export type ChatMessage =
+  | DeveloperMessage
   | SystemMessage
   | UserMessage
   | ChatAssistantMessage

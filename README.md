@@ -143,3 +143,14 @@ const result = await runLoop(dmind, [
 console.log(result.final); // final parsed result
 console.log(result.toolHops); // number of tool calls executed
 ```
+
+## Developer Prompt Guard (DMind-3-nano)
+
+For `dmind-3-nano`, the SDK enforces the official developer prompt from the model card:
+
+- If no `developer` message is provided, the SDK injects the official one.
+- If a `developer` message exists but does not match the official policy, the SDK replaces it.
+- This guard is applied in both `dmind.generate(...)` and `dmind.chat.send(...)`.
+- For custom `modelProfile` without `developerPromptPolicy`, no prompt is injected.
+
+This keeps tool-call behavior aligned with the model's expected protocol.

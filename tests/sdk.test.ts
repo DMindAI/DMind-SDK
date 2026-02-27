@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DMind, runLoop, type ModelProfile } from "../src";
+import {
+  DMind,
+  DMIND_3_NANO_DEVELOPER_PROMPT,
+  runLoop,
+  type ModelProfile
+} from "../src";
 
 describe("DMind parser", () => {
   it("parses official protocol tool call", () => {
@@ -117,6 +122,45 @@ describe("DMind validator", () => {
 });
 
 describe("DMind runtime", () => {
+  it("injects official developer prompt when caller prompt is missing", async () => {
+    let capturedMessages: Array<{ role: string; content: string }> = [];
+    const sdk = new DMind({
+      modelGenerate: async (messages) => {
+        capturedMessages = messages;
+        return "ok";
+      }
+    });
+
+    await sdk.generate([{ role: "user", content: "hello" }]);
+
+    expect(capturedMessages[0]).toEqual({
+      role: "developer",
+      content: DMIND_3_NANO_DEVELOPER_PROMPT
+    });
+    expect(capturedMessages[1]).toEqual({ role: "user", content: "hello" });
+  });
+
+  it("overrides invalid developer prompt with official prompt", async () => {
+    let capturedMessages: Array<{ role: string; content: string }> = [];
+    const sdk = new DMind({
+      modelGenerate: async (messages) => {
+        capturedMessages = messages;
+        return "ok";
+      }
+    });
+
+    await sdk.generate([
+      { role: "developer", content: "Use tools if needed." },
+      { role: "user", content: "swap SOL to USDC" }
+    ]);
+
+    const developerMessages = capturedMessages.filter(
+      (msg) => msg.role === "developer"
+    );
+    expect(developerMessages).toHaveLength(1);
+    expect(developerMessages[0].content).toBe(DMIND_3_NANO_DEVELOPER_PROMPT);
+  });
+
   it("runs multi-turn tool loop with function_response feedback", async () => {
     let turn = 0;
     const sdk = new DMind({
@@ -190,5 +234,19 @@ describe("DMind extensibility", () => {
     if (parsed.type === "parse_error") {
       expect(parsed.code).toBe("E_TOOL_UNKNOWN");
     }
+  });
+
+  it("skips developer prompt enforcement when profile policy is not configured", async () => {
+    let capturedMessages: Array<{ role: string; content: string }> = [];
+    const sdk = new DMind({
+      modelProfile: customProfile,
+      modelGenerate: async (messages) => {
+        capturedMessages = messages;
+        return "ok";
+      }
+    });
+
+    await sdk.generate([{ role: "user", content: "hello" }]);
+    expect(capturedMessages).toEqual([{ role: "user", content: "hello" }]);
   });
 });
