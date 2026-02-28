@@ -25,6 +25,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DMindAI/DMind-SDK.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DMindAI/DMind-SDK/issues"
+  },
+  "homepage": "https://github.com/DMindAI/DMind-SDK#readme",
   "engines": {
     "node": ">=18"
   },
