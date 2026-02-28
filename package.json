@@ -1,6 +1,6 @@
 {
   "name": "@dmindai/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK for DMind AI — chat completions with built-in crypto trading tools (SEARCH_TOKEN, EXECUTE_SWAP).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
